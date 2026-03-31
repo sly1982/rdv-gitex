@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Gamifiers | Prenez RDV au GITEX</title>
+  <style>
+    :root {
+      --bg: #050816;
+      --bg-deep: #02040c;
+      --green: #6dff7a;
+      --green-soft: rgba(109, 255, 122, 0.25);
+      --cyan: #5df7ff;
+      --pink: #ff4fd8;
+      --gold: #ffd84d;
+      --white: #f7fbff;
+      --muted: rgba(247, 251, 255, 0.76);
+      --glass: rgba(10, 14, 29, 0.65);
+      --border: rgba(255, 255, 255, 0.12);
+      --shadow: 0 0 24px rgba(93, 247, 255, 0.12), 0 0 48px rgba(109, 255, 122, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0c1533 0%, var(--bg) 45%, var(--bg-deep) 100%);
+      color: var(--white);
+      overflow: hidden;
+    }
+
+    canvas#matrix {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.45;
+    }
+
+    .noise,
+    .grid,
+    .scanlines,
+    .glow-orb {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .grid {
+      z-index: 1;
+      background-image:
+        linear-gradient(rgba(93, 247, 255, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(93, 247, 255, 0.08) 1px, transparent 1px);
+      background-size: 48px 48px;
+      mask-image: radial-gradient(circle at center, black 35%, transparent 85%);
+      opacity: 0.24;
+      animation: floatGrid 14s linear infinite;
+    }
+
+    .scanlines {
+      z-index: 2;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255,255,255,0.03),
+        rgba(255,255,255,0.03) 1px,
+        transparent 2px,
+        transparent 5px
+      );
+      mix-blend-mode: soft-light;
+      opacity: 0.18;
+    }
+
+    .noise {
+      z-index: 2;
+      opacity: 0.05;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255,255,255,0.35) 0 1px, transparent 1px),
+        radial-gradient(circle at 70% 35%, rgba(255,255,255,0.25) 0 1px, transparent 1px),
+        radial-gradient(circle at 40% 80%, rgba(255,255,255,0.35) 0 1px, transparent 1px);
+      background-size: 180px 180px;
+    }
+
+    .glow-orb::before,
+    .glow-orb::after {
+      content: "";
+      position: absolute;
+      width: 32vw;
+      height: 32vw;
+      border-radius: 50%;
+      filter: blur(70px);
+      opacity: 0.22;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+
+    .glow-orb::before {
+      top: -10vw;
+      left: -8vw;
+      background: var(--cyan);
+    }
+
+    .glow-orb::after {
+      right: -8vw;
+      bottom: -12vw;
+      background: var(--pink);
+      animation-delay: 1.8s;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 5;
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px;
+    }
+
+    .panel {
+      position: relative;
+      width: min(100%, 1040px);
+      padding: 42px 34px;
+      border-radius: 32px;
+      background: linear-gradient(180deg, rgba(11, 17, 35, 0.82), rgba(6, 10, 22, 0.74));
+      border: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel::before,
+    .panel::after {
+      content: "";
+      position: absolute;
+      inset: auto;
+      pointer-events: none;
+    }
+
+    .panel::before {
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), var(--green), transparent);
+      opacity: 0.8;
+    }
+
+    .panel::after {
+      inset: 14px;
+      border-radius: 22px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 22px;
+    }
+
+    .chip {
+      padding: 9px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(93, 247, 255, 0.2);
+      background: rgba(93, 247, 255, 0.07);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .hero {
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+      text-shadow: 0 0 18px rgba(109, 255, 122, 0.35);
+    }
+
+    h1 {
+      margin: 0 auto;
+      max-width: 900px;
+      font-size: clamp(2rem, 4vw, 4.8rem);
+      line-height: 0.98;
+      font-weight: 1000;
+      letter-spacing: -0.04em;
+      text-transform: uppercase;
+      text-shadow: 0 0 18px rgba(93, 247, 255, 0.15);
+    }
+
+    .accent {
+      background: linear-gradient(90deg, var(--white), var(--cyan), var(--green));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      margin: 24px auto 0;
+      max-width: 760px;
+      font-size: clamp(1rem, 1.4vw, 1.22rem);
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .arcade-strip {
+      margin: 28px auto 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      padding: 12px 18px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,216,77,0.12), rgba(255,79,216,0.09), rgba(93,247,255,0.09));
+      border: 1px solid rgba(255,255,255,0.1);
+      font-weight: 700;
+      color: rgba(247,251,255,0.9);
+      box-shadow: inset 0 0 20px rgba(255,255,255,0.03);
+    }
+
+    .pixel {
+      display: inline-grid;
+      grid-template-columns: repeat(3, 10px);
+      gap: 3px;
+    }
+
+    .pixel span {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(109,255,122,0.45);
+      animation: blink 1.8s infinite;
+    }
+
+    .pixel span:nth-child(2) { animation-delay: .15s; background: var(--cyan); }
+    .pixel span:nth-child(3) { animation-delay: .3s; background: var(--pink); }
+    .pixel span:nth-child(4) { animation-delay: .45s; background: var(--gold); }
+    .pixel span:nth-child(5) { animation-delay: .6s; }
+    .pixel span:nth-child(6) { animation-delay: .75s; background: var(--cyan); }
+    .pixel span:nth-child(7) { animation-delay: .9s; background: var(--pink); }
+    .pixel span:nth-child(8) { animation-delay: 1.05s; }
+    .pixel span:nth-child(9) { animation-delay: 1.2s; background: var(--gold); }
+
+    .actions {
+      margin-top: 34px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .cta {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      min-width: min(90vw, 720px);
+      padding: 26px 34px;
+      border-radius: 24px;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      background: linear-gradient(135deg, #7dff87 0%, #48f7ff 45%, #d251ff 100%);
+      color: #06111f;
+      font-size: clamp(1.15rem, 1.7vw, 1.65rem);
+      font-weight: 1000;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      box-shadow:
+        0 18px 36px rgba(0, 0, 0, 0.35),
+        0 0 0 1px rgba(255,255,255,0.16) inset,
+        0 0 35px rgba(93,247,255,0.35);
+      transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .cta::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 20%, rgba(255,255,255,0.75) 50%, transparent 80%);
+      transform: translateX(-120%);
+      animation: shine 3.4s infinite;
+      z-index: -1;
+    }
+
+    .cta:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow:
+        0 24px 40px rgba(0, 0, 0, 0.42),
+        0 0 0 1px rgba(255,255,255,0.16) inset,
+        0 0 50px rgba(109,255,122,0.35);
+      filter: saturate(1.05);
+    }
+
+    .cta small {
+      display: block;
+      font-size: clamp(0.76rem, 1vw, 0.9rem);
+      font-weight: 800;
+      opacity: 0.9;
+      letter-spacing: 0.08em;
+      margin-top: 5px;
+    }
+
+    .cta-text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      line-height: 1.1;
+    }
+
+    .cta-icon {
+      font-size: 1.7em;
+      filter: drop-shadow(0 0 8px rgba(255,255,255,0.35));
+    }
+
+    .benefits {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .benefit {
+      position: relative;
+      padding: 18px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      text-align: center;
+    }
+
+    .benefit strong {
+      display: block;
+      font-size: 0.92rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 7px;
+      color: var(--white);
+    }
+
+    .benefit span {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .floating-icons {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .icon-card {
+      position: absolute;
+      width: 62px;
+      height: 62px;
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.09);
+      backdrop-filter: blur(8px);
+      font-size: 28px;
+      box-shadow: 0 0 24px rgba(93,247,255,0.12);
+      animation: floatIcon 5.6s ease-in-out infinite;
+    }
+
+    .icon-card.one { top: 6%; left: 4%; animation-delay: 0s; }
+    .icon-card.two { top: 12%; right: 6%; animation-delay: 1s; }
+    .icon-card.three { bottom: 10%; left: 7%; animation-delay: 1.8s; }
+    .icon-card.four { bottom: 8%; right: 9%; animation-delay: .6s; }
+
+    .footer-note {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 0.88rem;
+      color: rgba(247,251,255,0.58);
+      letter-spacing: 0.04em;
+    }
+
+    @keyframes shine {
+      to { transform: translateX(120%); }
+    }
+
+    @keyframes drift {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to { transform: translate3d(3vw, 2vw, 0) scale(1.08); }
+    }
+
+    @keyframes floatGrid {
+      from { transform: translateY(0); }
+      to { transform: translateY(48px); }
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 0.5; transform: scale(0.92); }
+      50% { opacity: 1; transform: scale(1.08); }
+    }
+
+    @keyframes floatIcon {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(2deg); }
+    }
+
+    @media (max-width: 860px) {
+      .benefits {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        padding: 28px 18px 22px;
+        border-radius: 24px;
+      }
+
+      .icon-card {
+        width: 50px;
+        height: 50px;
+        font-size: 22px;
+      }
+
+      .cta {
+        min-width: 100%;
+        padding: 22px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="matrix"></canvas>
+  <div class="glow-orb"></div>
+  <div class="grid"></div>
+  <div class="scanlines"></div>
+  <div class="noise"></div>
+
+  <main class="shell">
+    <section class="panel">
+      <div class="floating-icons" aria-hidden="true">
+        <div class="icon-card one">🎮</div>
+        <div class="icon-card two">🧩</div>
+        <div class="icon-card three">⚡</div>
+        <div class="icon-card four">🚀</div>
+      </div>
+
+      <div class="hero">
+        <div class="chips">
+          <div class="chip">Corporate Gamification</div>
+          <div class="chip">Immersive Demo</div>
+          <div class="chip">GITEX Africa</div>
+        </div>
+
+        <div class="eyebrow">The Gamifiers</div>
+        <h1>
+          <span class="accent">Prenez RDV au GITEX</span><br />
+          avec The Gamifiers
+        </h1>
+
+        <p class="subtitle">
+          Réservez un échange au GITEX pour une <strong>présentation claire</strong>, une <strong>démo immersive</strong> et un <strong>cadrage rapide</strong> de vos besoins en team building, onboarding, transformation, innovation ou engagement.
+        </p>
+
+        <div class="arcade-strip">
+          <div class="pixel" aria-hidden="true">
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+          </div>
+          <span>Think. Play. Lead.</span>
+        </div>
+
+        <div class="actions">
+          <a class="cta" href="mailto:slimane@thegamifiers.net?subject=RDV%20GITEX%20Africa%20-%20The%20Gamifiers&body=Bonjour%2C%0A%0AJe%20souhaite%20%C3%A9changer%20avec%20vous%20lors%20de%20GITEX%20Africa.%0A%0AVoici%20les%20%C3%A9l%C3%A9ments%20cl%C3%A9s%20concernant%20notre%20besoin%20%3A%0A%0AEntreprise%20%3A%0ASecteur%20%3A%0ANombre%20d%E2%80%99employ%C3%A9s%20%3A%0A%0A%C3%89v%C3%A9nement%20envisag%C3%A9%20%3A%0A%E2%98%90%20Team%20building%0A%E2%98%90%20Onboarding%0A%E2%98%90%20S%C3%A9minaire%20%2F%20Kick-off%0A%E2%98%90%20Formation%20%2F%20Sensibilisation%0A%E2%98%90%20Activation%20marketing%0A%E2%98%90%20Autre%20%3A%0A%0ADate%20%3A%0ALieu%20%3A%0A%0AObjectif%20principal%20%3A%0A%0ABudget%20estimatif%20%3A%0A%0A%E2%9C%85%20Disponibilit%C3%A9%20pour%20un%20meeting%20%C3%A0%20GITEX%20Africa%20%3A%0A%0AMardi%20%3A%0A%E2%98%90%2009h00%0A%E2%98%90%2010h00%0A%E2%98%90%2011h00%0A%E2%98%90%2012h00%0A%E2%98%90%2013h00%0A%E2%98%90%2014h00%0A%E2%98%90%2015h00%0A%E2%98%90%2016h00%0A%E2%98%90%2017h00%0A%E2%98%90%2018h00%0A%0AMercredi%20%3A%0A%E2%98%90%2009h00%0A%E2%98%90%2010h00%0A%E2%98%90%2011h00%0A%E2%98%90%2012h00%0A%E2%98%90%2013h00%0A%E2%98%90%2014h00%0A%E2%98%90%2015h00%0A%E2%98%90%2016h00%0A%E2%98%90%2017h00%0A%E2%98%90%2018h00%0A%0AJeudi%20%3A%0A%E2%98%90%2009h00%0A%E2%98%90%2010h00%0A%E2%98%90%2011h00%0A%E2%98%90%2012h00%0A%E2%98%90%2013h00%0A%E2%98%90%2014h00%0A%E2%98%90%2015h00%0A%E2%98%90%2016h00%0A%E2%98%90%2017h00%0A%E2%98%90%2018h00%0A%0AAutre%20cr%C3%A9neau%20%3A%20%0A%0ACommentaire%20%2F%20besoin%20sp%C3%A9cifique%20%3A%0A%0AMerci%2C%0A%0A--%0ASlimane%20Benjelloun%0AFounder%20%7C%20The%20Gamifiers%0A%28%2B212%29%206%2061%2079%2027%2082%0ACorporate%20Gamification%20%26%20Transformation%0A35%2B%20multinational%20clients%0A%0ADesigning%20measurable%20engagement%20for%20brands%20%26%20teams%0ACorporate%20overview%20%7C%20Linkedin%20%7C%20The%20Gamifiers" aria-label="Prendre rendez-vous au GITEX avec The Gamifiers">
+            <span class="cta-icon">🎯</span>
+            <span class="cta-text">
+              PRENEZ RDV AU GITEX AVEC THE GAMIFIERS
+              <small>Présentation • Démo • Cadrage</small>
+            </span>
+          </a>
+        </div>
+
+        <div class="benefits">
+          <div class="benefit">
+            <strong>Présentation</strong>
+            <span>Découvrez nos formats corporate les plus impactants en quelques minutes.</span>
+          </div>
+          <div class="benefit">
+            <strong>Démo</strong>
+            <span>Projetez-vous concrètement dans une mécanique immersive inspirée du jeu.</span>
+          </div>
+          <div class="benefit">
+            <strong>Cadrage</strong>
+            <span>Identifiez le format le plus pertinent selon votre contexte, vos enjeux et votre budget.</span>
+          </div>
+        </div>
+
+        <div class="footer-note">
+          35+ multinational clients • Corporate Gamification & Transformation
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    const chars = 'アァカサタナハマヤャラワ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ▲△◆◇◼◻+*';
+    const fontSize = Math.max(14, Math.min(20, width / 85));
+    let columns = Math.floor(width / fontSize);
+    let drops = Array.from({ length: columns }, () => Math.random() * -100);
+
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+      columns = Math.floor(width / fontSize);
+      drops = Array.from({ length: columns }, () => Math.random() * -100);
+    }
+
+    function draw() {
+      ctx.fillStyle = 'rgba(2, 4, 12, 0.14)';
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.font = fontSize + 'px monospace';
+
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars.charAt(Math.floor(Math.random() * chars.length));
+        const x = i * fontSize;
+        const y = drops[i] * fontSize;
+
+        const hue = i % 5 === 0 ? '#5df7ff' : i % 7 === 0 ? '#ff4fd8' : '#6dff7a';
+        ctx.fillStyle = hue;
+        ctx.fillText(text, x, y);
+
+        if (y > height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+
+        drops[i]++;
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    draw();
+  </script>
+</body>
+</html>
